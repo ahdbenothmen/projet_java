@@ -15,7 +15,7 @@ export default function LoginAdmin() {
     setErrorMessage("");
 
     try {
-      const response = await fetch("http://localhost:8080/backend-universite/api/admin/login", {
+      const response = await fetch("http://localhost:8080/universite-backend/api/admin/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
