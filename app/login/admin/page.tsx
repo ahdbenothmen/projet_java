@@ -1,13 +1,44 @@
 "use client";
 import { useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 export default function LoginAdmin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [errorMessage, setErrorMessage] = useState("");
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log({ email, password });
+    setErrorMessage("");
+
+    try {
+      const response = await fetch("http://localhost:8080/backend-universite/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        localStorage.setItem("adminNomUtilisateur", data.nomUtilisateur);
+        localStorage.setItem("adminEmail", data.email);
+        localStorage.setItem("adminToken", data.token);
+
+        router.push("/dashboard/admin");
+      } else {
+        setErrorMessage(data.message);
+      }
+    } catch (error) {
+      setErrorMessage("Erreur de connexion au serveur");
+      console.error(error);
+    }
+
   };
 
   return (
@@ -33,7 +64,6 @@ export default function LoginAdmin() {
           maxWidth: "420px",
         }}
       >
-        {/* Header */}
         <div id="login-header" style={{ textAlign: "center", marginBottom: "32px" }}>
           <div
             id="login-logo"
@@ -52,35 +82,45 @@ export default function LoginAdmin() {
               <path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2zm0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z" fill="#fff" />
             </svg>
           </div>
+
+
           <h1 style={{ color: "#2C2C2A", fontSize: "22px", fontWeight: 700, margin: 0 }}>
             Espace Administrateur
           </h1>
-          <p style={{ color: "#888780", fontSize: "14px", marginTop: "6px" }}>
-            Connectez-vous à votre espace d'administration
+
+          <p style={{ color: "#888780", fontSize: "14px", marginTop: "6px", marginBottom: "6px" }}>
+            Connectez-vous à votre espace {"d'administration"}
           </p>
+
+          {errorMessage && (
+            <p
+              style={{
+                color: "red",
+                fontSize: "13px",
+                marginTop: "4px",
+                marginBottom: "0",
+              }}
+            >
+              {errorMessage}
+            </p>
+          )}
         </div>
 
-        {/* Form */}
-        <form id="login-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+          <div>
 
-          {/* Email */}
-          <div id="field-email">
             <label htmlFor="email" style={labelStyle}>Email administrateur</label>
             <input
               id="email"
               type="email"
-              placeholder="admin@universite.tn"
+              placeholder="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = "#185FA5")}
-              onBlur={(e) => (e.target.style.borderColor = "#D3D1C7")}
             />
           </div>
-
-          {/* Password */}
-          <div id="field-password">
+          <div>
             <label htmlFor="password" style={labelStyle}>Mot de passe</label>
             <input
               id="password"
@@ -105,6 +145,9 @@ export default function LoginAdmin() {
           {/* Submit */}
           <button
             id="btn-submit"
+            />
+
+          <button
             type="submit"
             style={{
               background: "#185FA5",
@@ -120,6 +163,8 @@ export default function LoginAdmin() {
             }}
             onMouseOver={(e) => ((e.target as HTMLButtonElement).style.background = "#134d87")}
             onMouseOut={(e) => ((e.target as HTMLButtonElement).style.background = "#185FA5")}
+            
+
           >
             Se connecter
           </button>
