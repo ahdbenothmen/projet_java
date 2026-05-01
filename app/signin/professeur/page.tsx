@@ -60,7 +60,6 @@ export default function SigninProfesseur() {
     }
 
     try {
-      // FormData pour envoyer les fichiers
       const formData = new FormData();
       formData.append("cin", form.cin);
       formData.append("nom", form.nom);
@@ -71,8 +70,8 @@ export default function SigninProfesseur() {
       formData.append("telephone", form.telephone);
       formData.append("diplomes", form.diplome);
       formData.append("speciality", form.specialite);
-      if (form.photoProf)   formData.append("photo", form.photoProf);
-      if (form.photoCin)    formData.append("photoCin", form.photoCin);
+      if (form.photoProf)    formData.append("photo", form.photoProf);
+      if (form.photoCin)     formData.append("photoCin", form.photoCin);
       if (form.diplomeImage) formData.append("diplomePdf", form.diplomeImage);
 
       const response = await fetch(
@@ -80,7 +79,6 @@ export default function SigninProfesseur() {
         {
           method: "POST",
           body: formData,
-          // PAS de Content-Type header — navigateur le met automatiquement
         }
       );
 
@@ -139,54 +137,80 @@ export default function SigninProfesseur() {
 
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={labelStyle}>Numéro CIN <span style={{ color: "red" }}>*</span></label>
-                <input type="text" placeholder="Ex: 12345678" value={form.cin}
-                  onChange={set("cin")} required style={inputStyle}
-                  onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
+
+          <div>
+  <label style={labelStyle}>Numéro CIN <span style={{ color: "red" }}>*</span></label>
+  <input
+    type="number"
+    placeholder="Ex: 12345678"
+    value={form.cin}
+    onChange={(e) => {
+      const val = e.target.value;
+      if (val.length <= 8) set("cin")(e);
+    }}
+    required
+    min="10000000"
+    max="99999999"
+    autoComplete="new-password"
+    style={{
+      ...inputStyle,
+      MozAppearance: "textfield" as any,
+    }}
+    onFocus={focusStyle}
+    onBlur={(e) => {
+      blurStyle(e);
+      const val = parseInt(e.target.value);
+      if (e.target.value && (val < 10000000 || val > 99999999)) {
+        e.target.style.borderColor = "red";
+        alert("Le CIN doit être entre 10000000 et 99999999");
+      }
+    }}
+    onWheel={(e) => e.currentTarget.blur()}
+  />
+</div>
 
               <div style={{ display: "flex", gap: "12px" }}>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Nom <span style={{ color: "red" }}>*</span></label>
                   <input type="text" placeholder="Ben" value={form.nom}
-                    onChange={set("nom")} required style={inputStyle}
-                    onFocus={focusStyle} onBlur={blurStyle} />
+                    onChange={set("nom")} required
+                    style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Prénom <span style={{ color: "red" }}>*</span></label>
                   <input type="text" placeholder="Mohamed" value={form.prenom}
-                    onChange={set("prenom")} required style={inputStyle}
-                    onFocus={focusStyle} onBlur={blurStyle} />
+                    onChange={set("prenom")} required
+                    style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
               </div>
 
               <div>
                 <label style={labelStyle}>Email <span style={{ color: "red" }}>*</span></label>
                 <input type="email" placeholder="professeur@univ.tn" value={form.email}
-                  onChange={set("email")} required style={inputStyle}
-                  onFocus={focusStyle} onBlur={blurStyle} />
+                  onChange={set("email")} required
+                  style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
               <div>
                 <label style={labelStyle}>Mot de passe <span style={{ color: "red" }}>*</span></label>
                 <input type="password" placeholder="••••••••" value={form.password}
-                  onChange={set("password")} required style={inputStyle}
-                  onFocus={focusStyle} onBlur={blurStyle} />
+                  onChange={set("password")} required
+                  autoComplete="new-password"
+                  style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
               <div>
                 <label style={labelStyle}>Téléphone</label>
                 <input type="tel" placeholder="Ex: 22 123 456" value={form.telephone}
-                  onChange={set("telephone")} style={inputStyle}
-                  onFocus={focusStyle} onBlur={blurStyle} />
+                  onChange={set("telephone")}
+                  style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
               <div>
                 <label style={labelStyle}>Adresse</label>
                 <input type="text" placeholder="Tunis, Tunisie" value={form.adresse}
-                  onChange={set("adresse")} style={inputStyle}
-                  onFocus={focusStyle} onBlur={blurStyle} />
+                  onChange={set("adresse")}
+                  style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
               <div>
@@ -205,6 +229,7 @@ export default function SigninProfesseur() {
 
           {step === 2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
               <div>
                 <label style={labelStyle}>Diplôme <span style={{ color: "red" }}>*</span></label>
                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
@@ -222,7 +247,7 @@ export default function SigninProfesseur() {
                         borderRadius: "6px", border: "1px solid #D3D1C7",
                         display: "flex", flexDirection: "column", gap: "6px"
                       }}>
-                        <div style={{ fontSize: "12px", color: "#2C2C2A", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
+                        <div style={{ fontSize: "12px", color: "#2C2C2A", fontWeight: 600 }}>
                           <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {diplomeName}
                           </span>
