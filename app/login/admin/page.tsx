@@ -78,6 +78,7 @@ export default function LoginAdmin() {
               justifyContent: "center",
             }}
           >
+
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
               <path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2zm0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z" fill="#fff" />
             </svg>
@@ -114,6 +115,7 @@ export default function LoginAdmin() {
               id="email"
               type="email"
               placeholder="email"
+
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -124,6 +126,7 @@ export default function LoginAdmin() {
             <label htmlFor="password" style={labelStyle}>Mot de passe</label>
             <input
               id="password"
+
               type="password"
               placeholder="••••••••"
               value={password}
@@ -138,6 +141,7 @@ export default function LoginAdmin() {
           {/* Forgot */}
           <div style={{ textAlign: "right", marginTop: "-10px" }}>
             <a href="#" id="forgot-link" style={{ color: "#185FA5", fontSize: "13px", textDecoration: "none" }}>
+
               Mot de passe oublié ?
             </a>
           </div>
@@ -151,6 +155,7 @@ export default function LoginAdmin() {
             type="submit"
             style={{
               background: "#185FA5",
+
               color: "#fff",
               border: "none",
               borderRadius: "10px",
@@ -169,6 +174,7 @@ export default function LoginAdmin() {
             Se connecter
           </button>
         </form>
+
 
       </div>
     </div>
@@ -195,4 +201,5 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   transition: "border-color 0.2s",
   appearance: "none",
+
 };
