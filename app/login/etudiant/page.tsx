@@ -4,10 +4,33 @@ import { useState } from "react";
 export default function LoginEtudiant() {
   const [cin, setCin] = useState("");
   const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"error" | "warning" | "">("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log({ cin, password });
+    setMessage("");
+
+    try {
+      const res = await fetch("http://localhost:8080/api/etudiants/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cin, password }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        localStorage.setItem("etudiant", JSON.stringify(data.data));
+        window.location.replace("/dashboard/etudiant");
+      } else {
+        setMessageType("warning");
+        setMessage(data.message);
+      }
+    } catch (err) {
+      setMessageType("error");
+      setMessage("Erreur de connexion au serveur. Vérifiez que le backend Java tourne.");
+    }
   };
 
   return (
@@ -59,6 +82,33 @@ export default function LoginEtudiant() {
             Connectez-vous à votre compte
           </p>
         </div>
+
+        {/* Message d'erreur ou avertissement */}
+        {message && (
+          <div style={{
+            background: messageType === "warning" ? "#FFF8E1" : "#FFEBEE",
+            border: `1.5px solid ${messageType === "warning" ? "#FFB300" : "#EF5350"}`,
+            borderRadius: "10px",
+            padding: "14px 16px",
+            marginBottom: "20px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "10px",
+          }}>
+            <span style={{ fontSize: "20px", flexShrink: 0 }}>
+              {messageType === "warning" ? "⏳" : "❌"}
+            </span>
+            <p style={{
+              margin: 0,
+              fontSize: "13px",
+              color: messageType === "warning" ? "#E65100" : "#B71C1C",
+              fontWeight: 500,
+              lineHeight: "1.6",
+            }}>
+              {message}
+            </p>
+          </div>
+        )}
 
         {/* Form */}
         <form id="login-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
@@ -124,7 +174,6 @@ export default function LoginEtudiant() {
             Se connecter
           </button>
         </form>
-
       </div>
     </div>
   );
