@@ -12,7 +12,7 @@ export default function LoginEtudiant() {
     setMessage("");
 
     try {
-      const res = await fetch("http://localhost:8080/api/etudiants/login", {
+      const res = await fetch("http://localhost:8080/universite-backend/api/login/etudiant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cin, password }),
@@ -21,7 +21,7 @@ export default function LoginEtudiant() {
       const data = await res.json();
 
       if (data.success) {
-        localStorage.setItem("etudiant", JSON.stringify(data.data));
+        localStorage.setItem("etudiantToken", data.token);
         window.location.replace("/dashboard/etudiant");
       } else {
         setMessageType("warning");

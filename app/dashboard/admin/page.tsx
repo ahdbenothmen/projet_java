@@ -221,7 +221,7 @@ export default function DashboardAdmin() {
           />
         )}
         {activeNav === "Modules"     && <TabModules />}
-        {activeNav === "Étudiants"   && <TabVide label="Étudiants" />}
+        {activeNav === "Étudiants" && <TabEtudiants />}
         {activeNav === "Professeurs" && <TabProfesseurs />}
       </main>
     </div>
@@ -984,6 +984,327 @@ function TabProfesseurs() {
   );
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Onglet etudiants
+// ═════════════════════════════════════════════════════════════════════════════
+const ADMIN_ETU_API = "http://localhost:8080/universite-backend/api/admin/etudiants";
+
+interface EtudiantAdmin {
+  cin: string; nom: string; prenom: string; email: string;
+  telephone: string; adresse: string; status: string;
+  dateInscription: string; niveau: string; speciality: string;
+  photo: string | null; photoCin: string | null;
+}
+
+function TabEtudiants() {
+  const [tab, setTab]           = useState<"en_attente" | "approuve" | "rejete">("en_attente");
+  const [etudiants, setEtudiants] = useState<EtudiantAdmin[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState("");
+  const [selected, setSelected] = useState<EtudiantAdmin | null>(null);
+  const [acting, setActing]     = useState<string | null>(null);
+  const [notif, setNotif]       = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const getToken = () => localStorage.getItem("adminToken") ?? "";
+
+  const load = async (status: string, q = "") => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ status });
+      if (q.trim()) params.set("q", q.trim());
+      const res = await fetch(`${ADMIN_ETU_API}?${params}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.status === 401) { window.location.href = "/login/admin"; return; }
+      const data = await res.json();
+      setEtudiants(Array.isArray(data) ? data : []);
+    } catch {
+      setEtudiants([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(tab); }, [tab]);
+
+  const showNotif = (msg: string, type: "success" | "error") => {
+    setNotif({ msg, type });
+    setTimeout(() => setNotif(null), 4000);
+  };
+
+  const handleAction = async (cin: string, action: "approuver" | "rejeter") => {
+    setActing(cin + action);
+    try {
+      const res = await fetch(`${ADMIN_ETU_API}/${cin}/${action}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotif(
+          action === "approuver"
+            ? "✅ Étudiant approuvé — un email lui a été envoyé."
+            : "❌ Étudiant refusé — un email lui a été envoyé.",
+          action === "approuver" ? "success" : "error"
+        );
+        setSelected(null);
+        await load(tab, search);
+      } else {
+        showNotif(data.message || "Erreur", "error");
+      }
+    } catch {
+      showNotif("Impossible de contacter le serveur.", "error");
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const TABS: { key: "en_attente" | "approuve" | "rejete"; label: string; color: string; bg: string }[] = [
+    { key: "en_attente", label: "En attente", color: "#633806", bg: "#FAEEDA" },
+    { key: "approuve",   label: "Approuvés",  color: "#27500A", bg: "#EAF3DE" },
+    { key: "rejete",     label: "Refusés",    color: "#791F1F", bg: "#FCEBEB" },
+  ];
+
+  return (
+    <div style={{ padding: "28px", position: "relative" }}>
+
+      {/* Toast */}
+      {notif && (
+        <div style={{
+          position: "fixed", top: "24px", right: "28px", zIndex: 2000,
+          background: notif.type === "success" ? "#EAF3DE" : "#FCEBEB",
+          color: notif.type === "success" ? "#27500A" : "#791F1F",
+          border: `1.5px solid ${notif.type === "success" ? "#C0DD97" : "#F7C1C1"}`,
+          borderRadius: "12px", padding: "14px 20px",
+          fontSize: "13px", fontWeight: 600,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)", maxWidth: "360px",
+        }}>
+          {notif.msg}
+        </div>
+      )}
+
+      {/* En-tête */}
+      <div style={{ marginBottom: "24px" }}>
+        <h1 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#2C2C2A" }}>
+          Gestion des étudiants
+        </h1>
+        <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#888780" }}>
+          Approuver, refuser ou consulter les dossiers
+        </p>
+      </div>
+
+      {/* Onglets */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+        {TABS.map((t) => (
+          <button key={t.key} onClick={() => { setTab(t.key); setSearch(""); }}
+            style={{
+              padding: "8px 20px", borderRadius: "20px", border: "none",
+              background: tab === t.key ? t.bg : "#F1EFE8",
+              color: tab === t.key ? t.color : "#888780",
+              fontWeight: tab === t.key ? 700 : 400,
+              fontSize: "13px", cursor: "pointer",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Recherche */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "20px", maxWidth: "420px" }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") load(tab, search); }}
+          placeholder="Rechercher par nom ou prénom…"
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button onClick={() => load(tab, search)} style={{
+          padding: "9px 18px", background: "#185FA5", color: "#fff",
+          border: "none", borderRadius: "8px", fontSize: "13px",
+          fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+        }}>
+          Rechercher
+        </button>
+      </div>
+
+      {/* Liste */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "60px", color: "#888780" }}>Chargement…</div>
+      ) : etudiants.length === 0 ? (
+        <div style={{ background: "#fff", borderRadius: "14px", border: "1.5px solid #D3D1C7", padding: "48px", textAlign: "center", color: "#888780" }}>
+          Aucun étudiant dans cette catégorie.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {etudiants.map((e) => (
+            <div key={e.cin} onClick={() => setSelected(e)}
+              style={{
+                background: "#fff", borderRadius: "12px",
+                border: "1.5px solid #D3D1C7", padding: "14px 20px",
+                display: "flex", alignItems: "center", gap: "16px",
+                cursor: "pointer", transition: "box-shadow 0.15s",
+              }}
+              onMouseEnter={(ev) => (ev.currentTarget.style.boxShadow = "0 4px 16px rgba(24,95,165,0.10)")}
+              onMouseLeave={(ev) => (ev.currentTarget.style.boxShadow = "none")}
+            >
+              {/* Photo */}
+              <div style={{
+                width: "48px", height: "48px", borderRadius: "50%",
+                overflow: "hidden", flexShrink: 0, background: "#E6F1FB",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                border: "2px solid #D3D1C7",
+              }}>
+                {e.photo
+                  ? <img src={e.photo} alt={e.nom} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ fontSize: "16px", fontWeight: 700, color: "#185FA5" }}>{e.prenom?.[0]}{e.nom?.[0]}</span>
+                }
+              </div>
+
+              {/* Infos */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: "14px", color: "#2C2C2A" }}>{e.prenom} {e.nom}</div>
+                <div style={{ fontSize: "12px", color: "#888780", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {e.niveau || "—"} {e.speciality ? `· ${e.speciality}` : ""} · {e.email}
+                </div>
+              </div>
+
+              {/* Badge */}
+              <span style={{
+                background: e.status === "approuve" ? "#EAF3DE" : e.status === "rejete" ? "#FCEBEB" : "#FAEEDA",
+                color: e.status === "approuve" ? "#27500A" : e.status === "rejete" ? "#791F1F" : "#633806",
+                borderRadius: "20px", padding: "3px 12px", fontSize: "11px", fontWeight: 600,
+              }}>
+                {e.status === "approuve" ? "Approuvé" : e.status === "rejete" ? "Refusé" : "En attente"}
+              </span>
+
+              <div style={{ fontSize: "11px", color: "#B0ADA4", whiteSpace: "nowrap" }}>
+                {new Date(e.dateInscription).toLocaleDateString("fr-FR")}
+              </div>
+
+              <div style={{ fontSize: "18px", color: "#185FA5" }}>👁</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      {selected && (
+        <div onClick={() => setSelected(null)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px",
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#fff", borderRadius: "16px",
+            width: "100%", maxWidth: "600px",
+            maxHeight: "88vh", overflowY: "auto",
+            boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+          }}>
+            {/* Header */}
+            <div style={{
+              background: "#185FA5", padding: "20px 24px",
+              borderRadius: "16px 16px 0 0",
+              display: "flex", alignItems: "center", gap: "14px",
+              position: "sticky", top: 0, zIndex: 10,
+            }}>
+              <div style={{
+                width: "56px", height: "56px", borderRadius: "50%",
+                overflow: "hidden", flexShrink: 0,
+                border: "3px solid rgba(255,255,255,0.4)", background: "#0C447C",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {selected.photo
+                  ? <img src={selected.photo} alt={selected.nom} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ fontSize: "20px", fontWeight: 700, color: "#fff" }}>{selected.prenom?.[0]}{selected.nom?.[0]}</span>
+                }
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "17px", fontWeight: 700, color: "#fff" }}>{selected.prenom} {selected.nom}</div>
+                <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>
+                  {selected.niveau || "Niveau non renseigné"} {selected.speciality ? `· ${selected.speciality}` : ""}
+                </div>
+              </div>
+              <span style={{ background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: "20px", padding: "4px 12px", fontSize: "12px", fontWeight: 600 }}>
+                {selected.status === "approuve" ? "✅ Approuvé" : selected.status === "rejete" ? "❌ Refusé" : "⏳ En attente"}
+              </span>
+              <button onClick={() => setSelected(null)} style={{
+                background: "rgba(255,255,255,0.15)", border: "none",
+                color: "#fff", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "16px",
+              }}>✕</button>
+            </div>
+
+            {/* Corps */}
+            <div style={{ padding: "24px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+                {[
+                  { label: "CIN",         value: selected.cin },
+                  { label: "Email",       value: selected.email },
+                  { label: "Téléphone",   value: selected.telephone || "—" },
+                  { label: "Adresse",     value: selected.adresse   || "—" },
+                  { label: "Niveau",      value: selected.niveau    || "—" },
+                  { label: "Inscription", value: new Date(selected.dateInscription).toLocaleDateString("fr-FR") },
+                ].map((f) => (
+                  <div key={f.label} style={{ background: "#FAFAF8", borderRadius: "10px", padding: "12px 14px", border: "1px solid #F1EFE8" }}>
+                    <div style={{ fontSize: "11px", color: "#888780", fontWeight: 600, marginBottom: "4px" }}>{f.label}</div>
+                    <div style={{ fontSize: "13px", color: "#2C2C2A", fontWeight: 600, wordBreak: "break-all" }}>{f.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Photo CIN */}
+              {selected.photoCin && (
+                <div style={{ marginBottom: "20px" }}>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#888780", marginBottom: "8px" }}>Photo CIN</div>
+                  <img src={selected.photoCin} alt="CIN" style={{
+                    width: "100%", maxHeight: "160px", objectFit: "contain",
+                    borderRadius: "10px", border: "1.5px solid #D3D1C7", background: "#F1EFE8",
+                  }} />
+                </div>
+              )}
+
+              {/* Boutons action */}
+              {selected.status === "en_attente" && (
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button onClick={() => handleAction(selected.cin, "approuver")} disabled={!!acting}
+                    style={{
+                      flex: 1, border: "none", borderRadius: "10px", padding: "13px",
+                      fontSize: "14px", fontWeight: 700,
+                      cursor: acting ? "not-allowed" : "pointer",
+                      background: acting ? "#C0DD97" : "#3B6D11", color: "#fff",
+                    }}>
+                    {acting === selected.cin + "approuver" ? "Envoi en cours…" : "✅ Approuver"}
+                  </button>
+                  <button onClick={() => handleAction(selected.cin, "rejeter")} disabled={!!acting}
+                    style={{
+                      flex: 1, border: "none", borderRadius: "10px", padding: "13px",
+                      fontSize: "14px", fontWeight: 700,
+                      cursor: acting ? "not-allowed" : "pointer",
+                      background: acting ? "#F7C1C1" : "#A32D2D", color: "#fff",
+                    }}>
+                    {acting === selected.cin + "rejeter" ? "Envoi en cours…" : "❌ Refuser"}
+                  </button>
+                </div>
+              )}
+
+              {selected.status === "approuve" && (
+                <div style={{ background: "#EAF3DE", color: "#27500A", borderRadius: "10px", padding: "14px 16px", fontSize: "13px", fontWeight: 600, textAlign: "center" }}>
+                  ✅ Cet étudiant a été approuvé — il peut se connecter à son espace.
+                </div>
+              )}
+
+              {selected.status === "rejete" && (
+                <div style={{ background: "#FCEBEB", color: "#791F1F", borderRadius: "10px", padding: "14px 16px", fontSize: "13px", fontWeight: 600, textAlign: "center" }}>
+                  ❌ Cet étudiant a été refusé.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ═════════════════════════════════════════════════════════════════════════════
 // Onglet Modules
 // ═════════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 
 const NIVEAUX = ["Licence 1", "Licence 2", "Licence 3", "Master 1", "Master 2"];
 const SPECIALITES = ["Informatique", "Mathématiques", "Physique", "Chimie", "Biologie", "Économie", "Droit", "Médecine"];
@@ -71,11 +72,10 @@ export default function SigninEtudiant() {
       formData.append("photoCin", form.photoCin);
       formData.append("photoEtd", form.photoEtd);
 
-      const res = await fetch("http://localhost:8080/api/etudiants/inscription", {
-        method: "POST",
-        body: formData,
-      });
-
+ const res = await fetch("http://localhost:8080/universite-backend/api/signin/etudiant", {
+  method: "POST",
+  body: formData,
+});
       const data = await res.json();
 
       if (data.success) {
@@ -92,7 +92,7 @@ export default function SigninEtudiant() {
       } else {
         alert("❌ " + data.message);
       }
-    } catch (err) {
+      } catch {
       alert("❌ Erreur de connexion au serveur. Vérifiez que le backend Java tourne.");
     }
   };
@@ -191,7 +191,7 @@ export default function SigninEtudiant() {
 
               {/* Niveau */}
               <div>
-                <label style={labelStyle}>Niveau d'études <span style={{ color: "red" }}>*</span></label>
+                <label style={labelStyle}>Niveau d&#39;études <span style={{ color: "red" }}>*</span></label>
                 <select value={form.niveau} onChange={set("niveau")}
                   style={{ ...inputStyle, color: form.niveau ? "#2C2C2A" : "#888780", cursor: "pointer" }}
                   onFocus={focusStyle} onBlur={blurStyle}>
@@ -221,20 +221,20 @@ export default function SigninEtudiant() {
                 <input id="photocin" type="file" accept="image/*"
                   onChange={handleFileChange("photoCin")} style={fileInputStyle} />
                 {previewCin && (
-                  <div style={{ marginTop: "8px" }}>
-                    <img src={previewCin} alt="Aperçu CIN" style={{ width: "100%", maxHeight: "120px", objectFit: "cover", borderRadius: "8px" }} />
+                  <div style={{ marginTop: "8px", position: "relative", width: "100%", height: "120px" }}>
+                    <Image src={previewCin} alt="Aperçu CIN" fill style={{ objectFit: "cover", borderRadius: "8px" }} unoptimized />
                   </div>
                 )}
               </div>
 
               {/* Photo identité */}
               <div>
-                <label style={labelStyle}>Photo d'identité <span style={{ color: "red" }}>*</span></label>
+                <label style={labelStyle}>Photo d&#39;identité <span style={{ color: "red" }}>*</span></label>
                 <input id="photoetd" type="file" accept="image/*"
                   onChange={handleFileChange("photoEtd")} style={fileInputStyle} />
                 {previewEtd && (
-                  <div style={{ marginTop: "8px" }}>
-                    <img src={previewEtd} alt="Aperçu étudiant" style={{ width: "100%", maxHeight: "120px", objectFit: "cover", borderRadius: "8px" }} />
+                  <div style={{ marginTop: "8px", position: "relative", width: "100%", height: "120px" }}>
+                    <Image src={previewEtd} alt="Aperçu étudiant" fill style={{ objectFit: "cover", borderRadius: "8px" }} unoptimized />
                   </div>
                 )}
               </div>
