@@ -24,22 +24,35 @@ export default function LoginProfesseur() {
       );
 
       const data = await response.json();
+      
 
-      // Vérification du statut selon la réponse du backend
       if (data.success === false && data.message?.includes("attente")) {
-        // Statut = en attente ou en cours
         setAlert({ type: "warning", message: data.message });
-      } 
+      }
       else if (data.success === false && data.message?.includes("rejet")) {
-        // Statut = rejeté
         setAlert({ type: "error", message: data.message });
       }
       else if (data.success === true) {
-        // Statut = approuvé → redirection immédiate
-        window.location.href = "http://localhost:3000/dashboard/professeur";
+        // ✅ Sauvegarde la session + TOKEN dans localStorage
+        localStorage.setItem("professeur", JSON.stringify({
+          cin:    data.cin    || "",
+          nom:    data.nom    || "",
+          prenom: data.prenom || "",
+          email:  data.email  || email,
+          token:  data.token  || "",
+        }));
+        
+        console.log("DATA COMPLET:", data);
+console.log("TOKEN:", data.token);
+
+
+        localStorage.setItem("token", data.token || "");
+        
+        // ✅ Redirection vers le dashboard
+        window.location.href = "/dashboard/professeur";
+
       }
       else {
-        // Autre erreur (email/mdp incorrect, etc.)
         setAlert({ type: "error", message: data.message || "Email ou mot de passe incorrect." });
       }
 
@@ -208,7 +221,8 @@ export default function LoginProfesseur() {
           <p style={{ textAlign: "center", fontSize: "13px", color: "#888780", margin: 0 }}>
             Pas encore de compte ?{" "}
             <a href="/signin/professeur" style={{ color: "#185FA5", textDecoration: "none", fontWeight: 600 }}>
-             {"S'inscrire"} 
+
+              {"S'inscrire"}
             </a>
           </p>
 

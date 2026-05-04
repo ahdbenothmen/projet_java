@@ -13,7 +13,6 @@ interface Module {
   id: number;
   nom: string;
   coefficient: number;
-  note: number | null;
   professeurCin: string;
    professeurNom: string;   
   professeurPrenom: string;

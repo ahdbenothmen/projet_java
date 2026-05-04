@@ -18,6 +18,7 @@ interface Module {
   coefficient: number;
   professeur: string;
   inscrit: boolean;
+  note: number | null;
   prerequis: Prerequis[];
 }
 
@@ -40,6 +41,96 @@ export default function DashboardEtudiant() {
   const [modulePopup, setModulePopup] = useState<Module | null>(null);
   const [saving, setSaving]         = useState(false);
   const [notif, setNotif]           = useState<{ msg: string; type: "success" | "error" } | null>(null);
+const [showReleve, setShowReleve] = useState(false);
+
+const calculerMoyenne = () => {
+  const inscrits = modulesInscrits.filter((m) => m.note !== null);
+  if (inscrits.length === 0) return null;
+  const totalCoeff = inscrits.reduce((s, m) => s + m.coefficient, 0);
+  const totalPoints = inscrits.reduce((s, m) => s + (m.note ?? 0) * m.coefficient, 0);
+  return totalCoeff > 0 ? totalPoints / totalCoeff : null;
+};
+
+const telechargerPDF = () => {
+  const moyenne = calculerMoyenne();
+  const contenu = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #2C2C2A; }
+        h1 { color: #185FA5; font-size: 22px; margin-bottom: 4px; }
+        .subtitle { color: #888780; font-size: 13px; margin-bottom: 32px; }
+        .info { background: #F5F9FF; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; }
+        .info p { margin: 4px 0; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        thead tr { background: #185FA5; color: #fff; }
+        th { padding: 12px 14px; text-align: left; font-weight: 600; }
+        td { padding: 11px 14px; border-bottom: 1px solid #F1EFE8; }
+        tr:nth-child(even) { background: #F5F9FF; }
+        .note-admis { color: #27500A; font-weight: 700; }
+        .note-ajourn { color: #A32D2D; font-weight: 700; }
+        .note-vide { color: #888780; }
+        .moyenne-box { margin-top: 24px; background: #185FA5; color: #fff; border-radius: 12px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .moyenne-label { font-size: 15px; font-weight: 600; }
+        .moyenne-val { font-size: 28px; font-weight: 800; }
+        .footer { margin-top: 40px; font-size: 11px; color: #888780; text-align: center; border-top: 1px solid #F1EFE8; padding-top: 16px; }
+      </style>
+    </head>
+    <body>
+      <h1>Université de Mannouba</h1>
+      <div class="subtitle">Relevé de notes — Année 2025/2026</div>
+      <div class="info">
+        <p><strong>Étudiant :</strong> ${etudiant?.prenom} ${etudiant?.nom}</p>
+        <p><strong>Niveau :</strong> ${etudiant?.niveau || "—"}</p>
+        <p><strong>Email :</strong> ${etudiant?.email}</p>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Module</th>
+            <th>Coefficient</th>
+            <th>Note /20</th>
+            <th>Résultat</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${modulesInscrits.map((m, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${m.nom}</td>
+              <td>${m.coefficient}</td>
+              <td class="${m.note !== null ? (m.note >= 10 ? "note-admis" : "note-ajourn") : "note-vide"}">
+                ${m.note !== null ? m.note.toFixed(2) : "—"}
+              </td>
+              <td class="${m.note !== null ? (m.note >= 10 ? "note-admis" : "note-ajourn") : "note-vide"}">
+                ${m.note !== null ? (m.note >= 10 ? "Admis ✓" : "Ajourné ✗") : "En attente"}
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+      <div class="moyenne-box">
+        <span class="moyenne-label">Moyenne générale pondérée</span>
+        <span class="moyenne-val">${moyenne !== null ? moyenne.toFixed(2) + " /20" : "—"}</span>
+      </div>
+      <div class="footer">
+        Document généré le ${new Date().toLocaleDateString("fr-FR")} — Université de Mannouba
+      </div>
+    </body>
+    </html>
+  `;
+
+  const fenetre = window.open("", "_blank");
+  if (!fenetre) return;
+  fenetre.document.write(contenu);
+  fenetre.document.close();
+  fenetre.focus();
+  setTimeout(() => fenetre.print(), 500);
+};
+
 
   const getToken = () => localStorage.getItem("etudiantToken") ?? "";
 
@@ -283,6 +374,9 @@ const handleDesinscrire = async (module: Module) => {
             <h1 style={{ margin: 0, fontSize: "24px", fontWeight: 700 }}>Portail Étudiant</h1>
             <p style={{ margin: "4px 0 0 0", fontSize: "14px", opacity: 0.9 }}>Gestion des inscriptions aux modules</p>
           </div>
+          
+
+
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: "15px", fontWeight: 600 }}>{etudiant.prenom} {etudiant.nom}</div>
@@ -295,6 +389,11 @@ const handleDesinscrire = async (module: Module) => {
             }}>
               {etudiant.prenom?.charAt(0)}{etudiant.nom?.charAt(0)}
             </div>
+             <button
+            onClick={() => router.push("/dashboard/etudiant/profil")}              style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 16px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            >
+              👤 Mon Profil
+            </button>
             <button onClick={handleLogout} style={{
               background: "rgba(255,255,255,0.15)", color: "#fff",
               border: "1px solid rgba(255,255,255,0.4)", borderRadius: "8px",
@@ -302,19 +401,31 @@ const handleDesinscrire = async (module: Module) => {
             }}>
               Déconnexion
             </button>
-              <button
-            onClick={() => router.push("/dashboard/etudiant/profil")}              style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 16px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            >
-              👤 Mon Profil
-            </button>
-
+             
           </div>
         </div>
       </div>
 
       {/* Contenu */}
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "32px 16px" }}>
-
+<div style={{ display: "flex", justifyContent: "flex-end" }}>
+  <button
+    onClick={() => setShowReleve(true)}
+    style={{
+      background: "rgba(255,255,255,0.15)",
+      color: "#000",
+      border: "1px solid rgba(12, 12, 12, 0.4)",
+      borderRadius: "8px",
+      padding: "8px 16px",
+      marginBottom: "6px",
+      fontSize: "17px",
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    📄 Relevé de notes
+  </button>
+</div>
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", marginBottom: "32px" }}>
           <div style={{ background: "#fff", borderRadius: "12px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
@@ -372,6 +483,7 @@ const handleDesinscrire = async (module: Module) => {
                         <div style={{ fontSize: "12px", color: "#888780", marginTop: "4px" }}>
                           👨‍🏫 {module.professeur} · Coeff. {module.coefficient}
                         </div>
+                        
                       </div>
                       <button onClick={() => handleOuvrirPopup(module)} style={{
                         background: "#185FA5", color: "#fff",
@@ -404,50 +516,224 @@ const handleDesinscrire = async (module: Module) => {
             )}
 
             {/* Modules inscrits */}
-            {modulesInscrits.map((module) => (
-  <div key={module.id} style={{
-    background: "#fff", borderRadius: "12px", padding: "20px",
-    border: "2px solid #66BB6A",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  }}>
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-        <div style={{
-          width: "40px", height: "40px", background: "#EAF3DE",
-          borderRadius: "10px", display: "flex", alignItems: "center",
-          justifyContent: "center", fontSize: "20px",
-        }}>✅</div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: "15px", color: "#2C2C2A" }}>{module.nom}</div>
-          <div style={{ fontSize: "12px", color: "#888780", marginTop: "2px" }}>
-            👨‍🏫 {module.professeur} · Coeff. {module.coefficient}
+          {activeTab === "inscrits" && (
+  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    {modulesInscrits.length === 0 ? (
+      <div style={{ background: "#fff", borderRadius: "12px", padding: "48px", textAlign: "center", color: "#888780" }}>
+        Aucune inscription pour le moment.
+      </div>
+    ) : modulesInscrits.map((module) => (
+      <div key={module.id} style={{
+        background: "#fff", borderRadius: "12px", padding: "20px",
+        border: "2px solid #66BB6A",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{
+              width: "40px", height: "40px", background: "#EAF3DE",
+              borderRadius: "10px", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: "20px",
+            }}>✅</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "15px", color: "#2C2C2A" }}>{module.nom}</div>
+              <div style={{ fontSize: "12px", color: "#888780", marginTop: "2px" }}>
+                👨‍🏫 {module.professeur} · Coeff. {module.coefficient}
+              </div>
+              {/* ← Note ici */}
+              {module.note !== null ? (
+                <div style={{ marginTop: "6px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{
+                    background: module.note >= 10 ? "#EAF3DE" : "#FCEBEB",
+                    color: module.note >= 10 ? "#27500A" : "#A32D2D",
+                    borderRadius: "20px", padding: "3px 10px",
+                    fontSize: "12px", fontWeight: 700,
+                  }}>
+                    Note : {module.note.toFixed(2)} /20
+                  </span>
+                  <span style={{
+                    background: module.note >= 10 ? "#EAF3DE" : "#FCEBEB",
+                    color: module.note >= 10 ? "#27500A" : "#A32D2D",
+                    borderRadius: "20px", padding: "3px 10px",
+                    fontSize: "11px", fontWeight: 600,
+                  }}>
+                    {module.note >= 10 ? "Admis ✓" : "Ajourné ✗"}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ marginTop: "6px", fontSize: "12px", color: "#888780", fontStyle: "italic" }}>
+                  ⏳ Note en attente
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Bouton désinscription */}
+          <button onClick={() => handleDesinscrire(module)} style={{
+            background: "#FFEBEE", color: "#EF5350",
+            border: "1.5px solid #EF5350", borderRadius: "8px",
+            padding: "8px 14px", fontSize: "13px",
+            fontWeight: 600, cursor: "pointer",
+          }}
+            onMouseOver={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "#EF5350";
+              (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+            }}
+            onMouseOut={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "#FFEBEE";
+              (e.currentTarget as HTMLButtonElement).style.color = "#EF5350";
+            }}
+          >
+            Se désinscrire
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+          </>
+        )}
+
+        {/* Modal relevé de notes */}
+{showReleve && (
+  <div onClick={() => setShowReleve(false)} style={{
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+    zIndex: 1500, display: "flex", alignItems: "center",
+    justifyContent: "center", padding: "24px",
+  }}>
+    <div onClick={(e) => e.stopPropagation()} style={{
+      background: "#fff", borderRadius: "16px",
+      width: "100%", maxWidth: "680px",
+      maxHeight: "90vh", overflowY: "auto",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+    }}>
+      {/* Header modal */}
+      <div style={{
+        background: "#185FA5", padding: "20px 24px",
+        borderRadius: "16px 16px 0 0",
+        display: "flex", alignItems: "center",
+        justifyContent: "space-between",
+        position: "sticky", top: 0, zIndex: 10,
+      }}>
+        <div>
+          <div style={{ fontSize: "17px", fontWeight: 700, color: "#fff" }}>
+            📄 Relevé de notes
+          </div>
+          <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>
+            {etudiant.prenom} {etudiant.nom} — {etudiant.niveau || "—"}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button onClick={telechargerPDF} style={{
+            background: "#fff", color: "#185FA5",
+            border: "none", borderRadius: "8px",
+            padding: "8px 16px", fontSize: "13px",
+            fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: "6px",
+          }}>
+            ⬇️ Télécharger PDF
+          </button>
+          <button onClick={() => setShowReleve(false)} style={{
+            background: "rgba(255,255,255,0.15)", border: "none",
+            color: "#fff", borderRadius: "8px",
+            padding: "6px 12px", cursor: "pointer", fontSize: "16px",
+          }}>✕</button>
         </div>
       </div>
 
-      {/* Bouton désinscription */}
-      <button onClick={() => handleDesinscrire(module)} style={{
-        background: "#FFEBEE", color: "#EF5350",
-        border: "1.5px solid #EF5350", borderRadius: "8px",
-        padding: "8px 14px", fontSize: "13px",
-        fontWeight: 600, cursor: "pointer",
-      }}
-        onMouseOver={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "#EF5350";
-          (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-        }}
-        onMouseOut={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "#FFEBEE";
-          (e.currentTarget as HTMLButtonElement).style.color = "#EF5350";
-        }}
-      >
-        Se désinscrire
-      </button>
-    </div>
-  </div>
-))}
+      {/* Corps */}
+      <div style={{ padding: "24px" }}>
+        {/* Infos étudiant */}
+        <div style={{
+          background: "#F5F9FF", borderRadius: "10px",
+          padding: "14px 18px", marginBottom: "20px",
+          border: "1px solid #D8E8F5",
+        }}>
+          <div style={{ fontSize: "13px", color: "#2C2C2A" }}>
+            <strong>Email :</strong> {etudiant.email}
+          </div>
+          <div style={{ fontSize: "13px", color: "#2C2C2A", marginTop: "4px" }}>
+            <strong>Niveau :</strong> {etudiant.niveau || "—"}
+          </div>
+        </div>
+
+        {/* Tableau des notes */}
+        {modulesInscrits.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "32px", color: "#888780" }}>
+            Aucun module inscrit.
+          </div>
+        ) : (
+          <>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ background: "#185FA5", color: "#fff" }}>
+                  {["#", "Module", "Coefficient", "Note /20", "Résultat"].map((h) => (
+                    <th key={h} style={{ padding: "12px 14px", textAlign: "left", fontWeight: 600 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {modulesInscrits.map((m, i) => (
+                  <tr key={m.id} style={{ borderBottom: "1px solid #F1EFE8", background: i % 2 === 0 ? "#fff" : "#F5F9FF" }}>
+                    <td style={{ padding: "11px 14px", color: "#888780" }}>{i + 1}</td>
+                    <td style={{ padding: "11px 14px", fontWeight: 600, color: "#2C2C2A" }}>{m.nom}</td>
+                    <td style={{ padding: "11px 14px", color: "#2C2C2A" }}>{m.coefficient}</td>
+                    <td style={{ padding: "11px 14px", fontWeight: 700,
+                      color: m.note !== null ? (m.note >= 10 ? "#27500A" : "#A32D2D") : "#888780"
+                    }}>
+                      {m.note !== null ? m.note.toFixed(2) : "—"}
+                    </td>
+                    <td style={{ padding: "11px 14px" }}>
+                      {m.note !== null ? (
+                        <span style={{
+                          background: m.note >= 10 ? "#EAF3DE" : "#FCEBEB",
+                          color: m.note >= 10 ? "#27500A" : "#A32D2D",
+                          borderRadius: "20px", padding: "3px 10px",
+                          fontSize: "11px", fontWeight: 700,
+                        }}>
+                          {m.note >= 10 ? "Admis ✓" : "Ajourné ✗"}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "#888780" }}>En attente</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Moyenne générale */}
+            {(() => {
+              const moyenne = calculerMoyenne();
+              const totalCoeff = modulesInscrits.filter(m => m.note !== null).reduce((s, m) => s + m.coefficient, 0);
+              return (
+                <div style={{
+                  marginTop: "20px", background: "#185FA5",
+                  borderRadius: "12px", padding: "18px 24px",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <div>
+                    <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.8)", marginBottom: "4px" }}>
+                      Moyenne générale pondérée
+                    </div>
+                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>
+                      {totalCoeff > 0 ? `Basée sur ${modulesInscrits.filter(m => m.note !== null).length} module(s) notés — Total coeff. ${totalCoeff}` : "Aucune note disponible"}
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize: "32px", fontWeight: 800, color: "#fff",
+                  }}>
+                    {moyenne !== null ? moyenne.toFixed(2) + " /20" : "—"}
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );

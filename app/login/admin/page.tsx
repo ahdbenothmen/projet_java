@@ -124,18 +124,18 @@ export default function LoginAdmin() {
           </div>
           <div>
             <label htmlFor="password" style={labelStyle}>Mot de passe</label>
-            <input
-              id="password"
-
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = "#185FA5")}
-              onBlur={(e) => (e.target.style.borderColor = "#D3D1C7")}
-            />
+           <input
+  id="password"
+  type="password"
+  placeholder="••••••••"
+  value={password}
+  onChange={(e) => setPassword(e.target.value)}
+  required
+  autoComplete="new-password"
+  style={inputStyle}
+  onFocus={(e) => (e.target.style.borderColor = "#185FA5")}
+  onBlur={(e) => (e.target.style.borderColor = "#D3D1C7")}
+/>
           </div>
 
           {/* Forgot */}
