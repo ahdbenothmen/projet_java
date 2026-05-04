@@ -53,6 +53,20 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
 };
 
 const NAV_ITEMS = ["Tableau de bord", "Étudiants", "Professeurs", "Modules"];
+// Ajouter avec les autres interfaces
+interface AdminStats {
+  profsApprouves: number; profsRejetes: number; profsAttente: number;
+  etuApprouves: number;   etuRejetes: number;   etuAttente: number;
+  totalModules: number;
+}
+
+interface EtudiantInscrit {
+  cin: string; nom: string; prenom: string; email: string; niveau: string;
+}
+
+// Ajouter avec les autres constantes API
+const STATS_API          = "http://localhost:8080/universite-backend/api/admin/stats";
+const MODULE_ETU_API     = "http://localhost:8080/universite-backend/api/admin/module-etudiants";
 
 const API      = "http://localhost:8080/universite-backend/api/modules";
 const PROF_API = "http://localhost:8080/universite-backend/api/professeurs/search";
@@ -235,104 +249,279 @@ function TabDashboard({ totalEtudiants, totalClasses, totalProfesseurs, totalDem
   totalEtudiants: number; totalClasses: number;
   totalProfesseurs: number; totalDemandes: number;
 }) {
+  const [stats, setStats]               = useState<AdminStats | null>(null);
+  const [modules, setModules]           = useState<Module[]>([]);
+  const [moduleNbInscrits, setModuleNbInscrits] = useState<Record<number, number>>({});
+  const [searchModule, setSearchModule] = useState("");
+  const [modulePopup, setModulePopup]   = useState<Module | null>(null);
+  const [popupLoading, setPopupLoading] = useState(false);
+  const [popupEtudiants, setPopupEtudiants] = useState<EtudiantInscrit[]>([]);
+
+  const getToken = () => localStorage.getItem("adminToken") ?? "";
+
+  useEffect(() => {
+    // Charger stats
+    fetch(STATS_API, { headers: { Authorization: `Bearer ${getToken()}` } })
+      .then((r) => r.json()).then((d) => setStats(d)).catch(() => {});
+
+    // Charger modules + nb inscrits
+    fetch(API, { headers: { Authorization: `Bearer ${getToken()}` } })
+      .then((r) => r.json())
+      .then(async (data) => {
+        const liste: Module[] = Array.isArray(data) ? data : [];
+        setModules(liste);
+        const entries = await Promise.all(
+          liste.map(async (m) => {
+            try {
+              const r = await fetch(`${MODULE_ETU_API}?moduleId=${m.id}`, {
+                headers: { Authorization: `Bearer ${getToken()}` },
+              });
+              const d = await r.json();
+              return [m.id, d.nbInscrits ?? 0] as [number, number];
+            } catch { return [m.id, 0] as [number, number]; }
+          })
+        );
+        setModuleNbInscrits(Object.fromEntries(entries));
+      }).catch(() => {});
+  }, []);
+
+  const handleVoirEtudiants = async (m: Module) => {
+    setModulePopup(m);
+    setPopupLoading(true);
+    setPopupEtudiants([]);
+    try {
+      const res = await fetch(`${MODULE_ETU_API}?moduleId=${m.id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      setPopupEtudiants(Array.isArray(data.etudiants) ? data.etudiants : []);
+    } catch { setPopupEtudiants([]); }
+    finally { setPopupLoading(false); }
+  };
+
+  const modulesFiltres = modules.filter((m) =>
+    m.nom.toLowerCase().includes(searchModule.toLowerCase())
+  );
+
   return (
     <div style={{ padding: "28px" }}>
       <div style={{ marginBottom: "24px" }}>
         <p style={{ fontSize: "13px", color: "#888780", margin: 0 }}>Vue générale — Année 2025/2026</p>
       </div>
 
-      {/* KPI */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "24px" }}>
-        {[
-          { label: "Total Étudiants",   value: totalEtudiants,   sub: "+48 ce semestre",  color: "#185FA5", bg: "#E6F1FB" },
-          { label: "Professeurs",       value: totalProfesseurs, sub: "12 départements",  color: "#3B6D11", bg: "#EAF3DE" },
-          { label: "Classes actives",   value: totalClasses,     sub: `${NIVEAUX.length} niveaux`, color: "#BA7517", bg: "#FAEEDA" },
-          { label: "Demandes en cours", value: totalDemandes,    sub: "12 à traiter",     color: "#A32D2D", bg: "#FCEBEB" },
-        ].map((k) => (
-          <div key={k.label} style={{ background: "#fff", borderRadius: "12px", padding: "18px", border: "1.5px solid #D3D1C7" }}>
-            <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: k.bg, marginBottom: "12px" }} />
-            <div style={{ fontSize: "12px", color: "#888780", marginBottom: "4px" }}>{k.label}</div>
-            <div style={{ fontSize: "28px", fontWeight: 700, color: "#2C2C2A" }}>{k.value.toLocaleString("fr-TN")}</div>
-            <div style={{ fontSize: "11px", color: k.color, marginTop: "4px" }}>{k.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Table niveaux + Demandes */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "16px", marginBottom: "24px" }}>
-        <div style={{ background: "#fff", borderRadius: "12px", padding: "20px", border: "1.5px solid #D3D1C7" }}>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: "#2C2C2A", marginBottom: "16px" }}>Répartition par niveau</div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ borderBottom: "1.5px solid #D3D1C7" }}>
-                {["Niveau", "Classes", "Étudiants", "Taux admis"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: "11px", color: "#888780", fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {NIVEAUX.map((row) => (
-                <tr key={row.niveau} style={{ borderBottom: "1px solid #F1EFE8" }}>
-                  <td style={{ padding: "11px 8px", color: "#2C2C2A", fontWeight: 600 }}>{row.niveau}</td>
-                  <td style={{ padding: "11px 8px" }}>
-                    <span style={{ background: "#E6F1FB", color: "#0C447C", borderRadius: "20px", padding: "2px 10px", fontSize: "12px", fontWeight: 600 }}>{row.classes}</span>
-                  </td>
-                  <td style={{ padding: "11px 8px", color: "#2C2C2A" }}>{row.etudiants}</td>
-                  <td style={{ padding: "11px 8px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <div style={{ flex: 1, height: "6px", background: "#F1EFE8", borderRadius: "6px", overflow: "hidden" }}>
-                        <div style={{ width: `${row.tauxAdmis}%`, height: "100%", background: "#3B6D11", borderRadius: "6px" }} />
-                      </div>
-                      <span style={{ fontSize: "12px", color: "#3B6D11", fontWeight: 600, minWidth: "30px" }}>{row.tauxAdmis}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ background: "#fff", borderRadius: "12px", padding: "20px", border: "1.5px solid #D3D1C7" }}>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: "#2C2C2A", marginBottom: "16px" }}>Demandes récentes</div>
-          {RECENT_DEMANDES.map((d, i) => {
-            const s = STATUS_STYLE[d.status];
-            return (
-              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: i < RECENT_DEMANDES.length - 1 ? "1px solid #F1EFE8" : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#E6F1FB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, color: "#185FA5", flexShrink: 0 }}>
-                    {d.nom.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#2C2C2A" }}>{d.nom}</div>
-                    <div style={{ fontSize: "11px", color: "#888780" }}>{d.niveau}</div>
-                  </div>
+      {/* ── Modal étudiants inscrits ── */}
+      {modulePopup && (
+        <div onClick={() => setModulePopup(null)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px",
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "560px",
+            maxHeight: "85vh", overflowY: "auto", boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{
+              background: "#185FA5", padding: "20px 24px", borderRadius: "16px 16px 0 0",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              position: "sticky", top: 0, zIndex: 10,
+            }}>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>Étudiants inscrits</div>
+                <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>
+                  📘 {modulePopup.nom}
                 </div>
-                <span style={{ background: s.bg, color: s.color, borderRadius: "20px", padding: "3px 10px", fontSize: "11px", fontWeight: 600 }}>{s.label}</span>
               </div>
-            );
-          })}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: "20px", padding: "4px 12px", fontSize: "12px", fontWeight: 600 }}>
+                  {popupLoading ? "…" : `${popupEtudiants.length} inscrit${popupEtudiants.length !== 1 ? "s" : ""}`}
+                </span>
+                <button onClick={() => setModulePopup(null)} style={{
+                  background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
+                  borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "16px",
+                }}>✕</button>
+              </div>
+            </div>
+            <div style={{ padding: "20px" }}>
+              {popupLoading ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#888780" }}>Chargement…</div>
+              ) : popupEtudiants.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#888780", fontSize: "14px" }}>
+                  Aucun étudiant inscrit à ce module.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {popupEtudiants.map((etu) => (
+                    <div key={etu.cin} style={{
+                      display: "flex", alignItems: "center", gap: "12px",
+                      padding: "12px 14px", background: "#FAFAF8",
+                      borderRadius: "10px", border: "1px solid #F1EFE8",
+                    }}>
+                      <div style={{
+                        width: "38px", height: "38px", borderRadius: "50%",
+                        background: "#E6F1FB", display: "flex", alignItems: "center",
+                        justifyContent: "center", fontSize: "13px", fontWeight: 700,
+                        color: "#185FA5", flexShrink: 0,
+                      }}>
+                        {etu.prenom?.[0]}{etu.nom?.[0]}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#2C2C2A" }}>
+                          {etu.prenom} {etu.nom}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#888780", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {etu.email}
+                        </div>
+                      </div>
+                      <span style={{
+                        background: "#E6F1FB", color: "#0C447C", borderRadius: "20px",
+                        padding: "3px 10px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap",
+                      }}>
+                        {etu.niveau || "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+      )}
+
+    
+
+      {/* KPI row 2 — stats temps réel */}
+      {stats && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "24px" }}>
+          <div style={{ background: "#fff", borderRadius: "12px", padding: "18px", border: "1.5px solid #D3D1C7" }}>
+            <div style={{ fontSize: "12px", color: "#888780", marginBottom: "4px" }}>📘 Modules enregistrés</div>
+            <div style={{ fontSize: "32px", fontWeight: 700, color: "#185FA5" }}>{stats.totalModules}</div>
+          </div>
+          <div style={{ background: "#fff", borderRadius: "12px", padding: "18px", border: "1.5px solid #D3D1C7" }}>
+            <div style={{ fontSize: "12px", color: "#888780", marginBottom: "10px" }}>👨‍🏫 Professeurs</div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {[
+                { label: "Approuvés",  value: stats.profsApprouves, bg: "#EAF3DE", color: "#27500A" },
+                { label: "En attente", value: stats.profsAttente,   bg: "#FAEEDA", color: "#633806" },
+                { label: "Refusés",    value: stats.profsRejetes,   bg: "#FCEBEB", color: "#791F1F" },
+              ].map((s) => (
+                <div key={s.label} style={{ flex: 1, background: s.bg, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "20px", fontWeight: 700, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: "10px", color: s.color, marginTop: "2px" }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: "#fff", borderRadius: "12px", padding: "18px", border: "1.5px solid #D3D1C7" }}>
+            <div style={{ fontSize: "12px", color: "#888780", marginBottom: "10px" }}>🎓 Étudiants</div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {[
+                { label: "Approuvés",  value: stats.etuApprouves, bg: "#EAF3DE", color: "#27500A" },
+                { label: "En attente", value: stats.etuAttente,   bg: "#FAEEDA", color: "#633806" },
+                { label: "Refusés",    value: stats.etuRejetes,   bg: "#FCEBEB", color: "#791F1F" },
+              ].map((s) => (
+                <div key={s.label} style={{ flex: 1, background: s.bg, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "20px", fontWeight: 700, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: "10px", color: s.color, marginTop: "2px" }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Liste des modules avec recherche ── */}
+      <div style={{ background: "#fff", borderRadius: "12px", padding: "20px", border: "1.5px solid #D3D1C7" }}>
+
+        {/* En-tête + recherche */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "#2C2C2A" }}>
+            📘 Modules — inscriptions
+            <span style={{ fontSize: "12px", fontWeight: 400, color: "#888780", marginLeft: "8px" }}>
+              {modulesFiltres.length} module{modulesFiltres.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <input
+            value={searchModule}
+            onChange={(e) => setSearchModule(e.target.value)}
+            placeholder="Rechercher un module…"
+            style={{
+              padding: "8px 14px", border: "1.5px solid #D3D1C7", borderRadius: "8px",
+              fontSize: "13px", color: "#2C2C2A", background: "#FAFAF8",
+              outline: "none", width: "220px",
+            }}
+          />
+        </div>
+
+        {/* Liste */}
+        {modules.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "32px", color: "#888780", fontSize: "13px" }}>
+            Chargement…
+          </div>
+        ) : modulesFiltres.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "32px", color: "#888780", fontSize: "13px" }}>
+            Aucun module trouvé pour « {searchModule} »
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {modulesFiltres.map((m) => {
+              const nb = moduleNbInscrits[m.id] ?? 0;
+              return (
+                <div key={m.id} style={{
+                  display: "flex", alignItems: "center", gap: "12px",
+                  padding: "12px 16px", background: "#FAFAF8",
+                  borderRadius: "10px", border: "1px solid #F1EFE8",
+                }}>
+                  {/* Icône */}
+                  <div style={{
+                    width: "36px", height: "36px", borderRadius: "9px",
+                    background: "#E6F1FB", display: "flex", alignItems: "center",
+                    justifyContent: "center", fontSize: "16px", flexShrink: 0,
+                  }}>📘</div>
+
+                  {/* Nom + prof */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: "13px", color: "#2C2C2A" }}>{m.nom}</div>
+                    <div style={{ fontSize: "11px", color: "#888780", marginTop: "2px" }}>
+                      Coeff. {m.coefficient}
+                      {(m.professeurPrenom || m.professeurNom) &&
+                        ` · ${m.professeurPrenom ?? ""} ${m.professeurNom ?? ""}`.trim()}
+                    </div>
+                  </div>
+
+                  {/* Badge nb inscrits — cliquable */}
+                  <button
+                    onClick={() => handleVoirEtudiants(m)}
+                    title="Voir les étudiants inscrits"
+                    style={{
+                      display: "flex", alignItems: "center", gap: "6px",
+                      background: nb > 0 ? "#E6F1FB" : "#F1EFE8",
+                      color: nb > 0 ? "#0C447C" : "#888780",
+                      border: `1.5px solid ${nb > 0 ? "#B8D4F0" : "#D3D1C7"}`,
+                      borderRadius: "20px", padding: "5px 12px",
+                      fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#185FA5";
+                      e.currentTarget.style.color = "#fff";
+                      e.currentTarget.style.borderColor = "#185FA5";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = nb > 0 ? "#E6F1FB" : "#F1EFE8";
+                      e.currentTarget.style.color = nb > 0 ? "#0C447C" : "#888780";
+                      e.currentTarget.style.borderColor = nb > 0 ? "#B8D4F0" : "#D3D1C7";
+                    }}
+                  >
+                    <span>🎓</span>
+                    <span>{nb} étudiant{nb !== 1 ? "s" : ""}</span>
+                    <span style={{ fontSize: "11px", opacity: 0.7 }}>👁</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Stats statut */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
-        {[
-          { label: "Admis",      count: 18, total: totalDemandes, color: "#3B6D11", bg: "#EAF3DE", bar: "#3B6D11" },
-          { label: "En attente", count: 12, total: totalDemandes, color: "#BA7517", bg: "#FAEEDA", bar: "#BA7517" },
-          { label: "Non retenu", count: 8,  total: totalDemandes, color: "#A32D2D", bg: "#FCEBEB", bar: "#A32D2D" },
-        ].map((s) => (
-          <div key={s.label} style={{ background: "#fff", borderRadius: "12px", padding: "18px", border: "1.5px solid #D3D1C7" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#2C2C2A" }}>{s.label}</span>
-              <span style={{ background: s.bg, color: s.color, borderRadius: "20px", padding: "2px 10px", fontSize: "12px", fontWeight: 700 }}>{s.count}</span>
-            </div>
-            <div style={{ height: "8px", background: "#F1EFE8", borderRadius: "8px", overflow: "hidden" }}>
-              <div style={{ width: `${Math.round((s.count / s.total) * 100)}%`, height: "100%", background: s.bar, borderRadius: "8px" }} />
-            </div>
-            <div style={{ fontSize: "11px", color: "#888780", marginTop: "6px" }}>{Math.round((s.count / s.total) * 100)}% du total</div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -905,25 +1094,39 @@ function TabProfesseurs() {
                 </div>
               )}
 
-              {/* Diplôme PDF */}
-              {selected.diplomePdf && (
-                <div style={{ marginBottom: "24px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#888780", marginBottom: "8px" }}>
-                    Diplôme (PDF)
-                  </div>
-                  
-                    <a href={selected.diplomePdf} target="_blank" rel="noopener noreferrer"
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: "8px",
-                      background: "#E6F1FB", color: "#185FA5", borderRadius: "8px",
-                      padding: "10px 16px", fontSize: "13px", fontWeight: 600,
-                      textDecoration: "none",
-                    }}
-                  >
-                    📄 Visualiser le diplôme
-                  </a>
-                </div>
-              )}
+            {/* Diplôme PDF */}
+{selected.diplomePdf && (
+  <div style={{ marginBottom: "24px" }}>
+    <div style={{ fontSize: "12px", fontWeight: 600, color: "#888780", marginBottom: "8px" }}>
+      Diplôme (PDF)
+    </div>
+    <div style={{ display: "flex", gap: "10px" }}>
+      {/* Bouton ouvrir dans nouvel onglet */}
+      <button
+        onClick={() => {
+          const win = window.open();
+          if (win) {
+            win.document.write(
+              `<iframe src="${selected.diplomePdf}" style="width:100%;height:100vh;border:none;"></iframe>`
+            );
+            win.document.title = `Diplôme — ${selected.prenom} ${selected.nom}`;
+          }
+        }}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          background: "#E6F1FB", color: "#185FA5", borderRadius: "8px",
+          padding: "10px 16px", fontSize: "13px", fontWeight: 600,
+          border: "none", cursor: "pointer",
+        }}
+      >
+        📄 Visualiser le diplôme
+      </button>
+
+     
+    </div>
+
+  </div>
+)}
 
               {/* ── Boutons d'action ── */}
               {selected.status === "en_attente" && (

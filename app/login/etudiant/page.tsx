@@ -173,6 +173,12 @@ export default function LoginEtudiant() {
           >
             Se connecter
           </button>
+            <p style={{ textAlign: "center", fontSize: "13px", color: "#888780", margin: 0 }}>
+            Pas encore de compte ?{" "}
+            <a href="/signin/etudiant" style={{ color: "#185FA5", textDecoration: "none", fontWeight: 600 }}>
+             {"S'inscrire"} 
+            </a>
+          </p>
         </form>
       </div>
     </div>

@@ -229,7 +229,7 @@ export default function SigninEtudiant() {
 
               {/* Photo identité */}
               <div>
-                <label style={labelStyle}>Photo d&#39;identité <span style={{ color: "red" }}>*</span></label>
+                <label style={labelStyle}>Photo d&#39;étudiant <span style={{ color: "red" }}>*</span></label>
                 <input id="photoetd" type="file" accept="image/*"
                   onChange={handleFileChange("photoEtd")} style={fileInputStyle} />
                 {previewEtd && (

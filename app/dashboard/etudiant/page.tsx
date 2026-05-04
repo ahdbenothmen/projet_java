@@ -302,6 +302,12 @@ const handleDesinscrire = async (module: Module) => {
             }}>
               Déconnexion
             </button>
+              <button
+            onClick={() => router.push("/dashboard/etudiant/profil")}              style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 16px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            >
+              👤 Mon Profil
+            </button>
+
           </div>
         </div>
       </div>
